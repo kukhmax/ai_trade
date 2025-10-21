@@ -3,14 +3,14 @@ import asyncio
 from typing import Dict, List, Optional
 import logging
 from .config import AppConfig
-from ..data.fetcher import DataFetcher
-from ..data.exchanges import BybitFetcher
-from ..data.processor import DataProcessor
-from ..analysis.technical import TechnicalAnalyzer
-from ..analysis.wyckoff import WyckoffAnalyzer
-from ..analysis.elliott import ElliottWaveAnalyzer
-from ..analysis.sentiment import SentimentAnalyzer
-from ..signals.generator import SignalGenerator
+from data.fetcher import DataFetcher
+from data.exchanges import BybitFetcher
+from data.processor import DataProcessor
+from analisis.technical import TechnicalAnalyzer
+from analisis.wyckoff import WyckoffAnalyzer
+from analisis.elliott import ElliottWaveAnalyzer
+from analisis.sentiment import SentimentAnalyzer
+from signals.generator import SignalGenerator
 
 class CryptoAIAgent:
     def __init__(self, config: AppConfig):

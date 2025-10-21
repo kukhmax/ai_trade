@@ -4,9 +4,9 @@ from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import logging
 from .config import AppConfig
-from ..data.fetcher import DataFetcher
-from ..data.exchanges import BybitFetcher
-from ..analysis.ai_core import DeepSeekAnalyzer, AISignal
+from data.fetcher import DataFetcher
+from data.exchanges import BybitFetcher
+from analisis.ai_core import DeepSeekAnalyzer, AISignal
 
 class UniversalAIAgent:
     def __init__(self, config: AppConfig):
