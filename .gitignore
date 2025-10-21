@@ -1,0 +1,45 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packages and build
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Caches and test artifacts
+.cache/
+.ipynb_checkpoints/
+pytest.cache/
+.mypy_cache/
+.pytype/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files (do not commit secrets)
+.env
+.env.*
+*.env
