@@ -120,6 +120,7 @@ Options:
   --no-news           Исключить анализ новостей
   --no-fundamental    Исключить фундаментальный анализ
   --format, -f        Формат вывода (text, json) [default: text]
+  --exchange, -x      Биржа данных (bybit, binance)
 ```
 
 **Бэктест:**
@@ -132,6 +133,7 @@ Options:
   --start-date, -s    Начальная дата (YYYY-MM-DD) [required]
   --end-date, -e      Конечная дата (YYYY-MM-DD) [required]
   --format, -f        Формат вывода (text, json) [default: text]
+  --exchange, -x      Биржа данных (bybit, binance)
 ```
 
 ## 🛠 Установка и настройка
@@ -153,10 +155,22 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Редактирование .env файла
-# Добавьте ваши API ключи:
+# Выбор биржи:
+# EXCHANGE=bybit  # или binance
+#
+# Ключи DeepSeek:
 # DEEPSEEK_API_KEY=your_key_here
-# BINANCE_API_KEY=your_key_here  
+#
+# Ключи Binance (если используете Binance):
+# BINANCE_API_KEY=your_key_here
 # BINANCE_API_SECRET=your_secret_here
+# BINANCE_TESTNET=True
+#
+# Ключи Bybit (если используете Bybit):
+# BYBIT_API_KEY=your_key_here
+# BYBIT_API_SECRET=your_secret_here
+# BYBIT_MARKET_TYPE=linear  # или spot
+# BYBIT_TESTNET=True
 ```
 
 ### 3. Проверка установки
@@ -230,9 +244,13 @@ result = await agent.analyze_pair(
 
 ### Интеграция с другими биржами
 ```python
-# В data/fetcher.py можно добавить поддержку других бирж
-class BybitFetcher:
-    async def get_klines(self, symbol, timeframe):
-        # Реализация для Bybit API
-        pass
+# Поддержка Bybit реализована через ccxt в data/exchanges/bybit.py
+from core.universal_agent import UniversalAIAgent
+from core.config import AppConfig
+
+config = AppConfig()
+config.exchange = 'bybit'  # или используйте CLI: --exchange bybit
+agent = UniversalAIAgent(config)
+
+result = await agent.analyze_pair(symbol="BTCUSDT", timeframe="4h", analysis_methods=["technical"]) 
 ```

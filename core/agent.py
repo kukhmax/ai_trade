@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 import logging
 from .config import AppConfig
 from ..data.fetcher import DataFetcher
+from ..data.exchanges import BybitFetcher
 from ..data.processor import DataProcessor
 from ..analysis.technical import TechnicalAnalyzer
 from ..analysis.wyckoff import WyckoffAnalyzer
@@ -17,7 +18,10 @@ class CryptoAIAgent:
         self.logger = logging.getLogger(__name__)
         
         # Инициализация модулей
-        self.data_fetcher = DataFetcher(config.binance)
+        if config.exchange == 'bybit':
+            self.data_fetcher = BybitFetcher(config.bybit)
+        else:
+            self.data_fetcher = DataFetcher(config.binance)
         self.data_processor = DataProcessor()
         self.technical_analyzer = TechnicalAnalyzer()
         self.wyckoff_analyzer = WyckoffAnalyzer()

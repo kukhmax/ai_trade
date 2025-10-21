@@ -5,14 +5,19 @@ from datetime import datetime, timedelta
 import logging
 from .config import AppConfig
 from ..data.fetcher import DataFetcher
+from ..data.exchanges import BybitFetcher
 from ..analysis.ai_core import DeepSeekAnalyzer, AISignal
 
 class UniversalAIAgent:
     def __init__(self, config: AppConfig):
         self.config = config
-        self.data_fetcher = DataFetcher(config.binance)
-        self.ai_analyzer = DeepSeekAnalyzer(config.deepseek.api_key)
         self.logger = logging.getLogger(__name__)
+        # Выбор фетчера по конфигу
+        if config.exchange == 'bybit':
+            self.data_fetcher = BybitFetcher(config.bybit)
+        else:
+            self.data_fetcher = DataFetcher(config.binance)
+        self.ai_analyzer = DeepSeekAnalyzer(config.deepseek.api_key)
         
         # Валидация конфигурации
         config.validate()

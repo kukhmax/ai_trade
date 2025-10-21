@@ -14,7 +14,10 @@ from core.config import AppConfig
 async def analyze_command(args):
     """Команда анализа пары"""
     try:
-        agent = UniversalAIAgent(AppConfig())
+        config = AppConfig()
+        if getattr(args, 'exchange', None):
+            config.exchange = args.exchange
+        agent = UniversalAIAgent(config)
         
         result = await agent.analyze_pair(
             symbol=args.symbol.upper(),
@@ -87,7 +90,10 @@ async def backtest_command(args):
     try:
         from backtesting.enhanced_backtester import EnhancedBacktester
         
-        agent = UniversalAIAgent(AppConfig())
+        config = AppConfig()
+        if getattr(args, 'exchange', None):
+            config.exchange = args.exchange
+        agent = UniversalAIAgent(config)
         backtester = EnhancedBacktester(agent)
         
         print(f"🔍 Запуск бэктеста для {args.symbol}...")
@@ -216,6 +222,11 @@ def main():
     list_parser.add_argument('--format', '-f', choices=['text', 'json'],
                            default='text', help='Формат вывода')
     
+    analyze_parser.add_argument('--exchange', '-x', choices=['bybit', 'binance'],
+                               help='Выбор биржи данных')
+    backtest_parser.add_argument('--exchange', '-x', choices=['bybit', 'binance'],
+                               help='Выбор биржи данных')
+
     args = parser.parse_args()
     
     if not args.command:
