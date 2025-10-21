@@ -1,0 +1,37 @@
+# Базовые библиотеки
+python-binance>=3.0.0
+pandas>=1.5.0
+numpy>=1.21.0
+requests>=2.28.0
+python-dotenv>=0.19.0
+ta-lib>=0.4.24
+
+# Альтернатива TA-Lib если возникают проблемы с установкой
+ta>=0.10.0
+
+# Анализ данных
+scikit-learn>=1.0.0
+scipy>=1.8.0
+
+# Визуализация
+matplotlib>=3.5.0
+plotly>=5.10.0
+seaborn>=0.11.0
+
+# Асинхронность
+aiohttp>=3.8.0
+asyncio>=3.9.0
+
+# Логирование
+loguru>=0.6.0
+
+# Даты
+python-dateutil>=2.8.0
+
+# Веб-дашборд
+dash>=2.14.0
+dash-bootstrap-components>=1.5.0
+
+# Дополнительные утилиты
+python-telegram-bot>=20.0
+websocket-client>=1.6.0
