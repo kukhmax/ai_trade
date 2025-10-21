@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 load_dotenv()
@@ -65,11 +65,11 @@ class BacktestConfig:
 class AppConfig:
     # Выбор биржи: 'bybit' или 'binance'
     exchange: str = os.getenv('EXCHANGE', 'bybit').lower()
-    binance: BinanceConfig = BinanceConfig()
-    bybit: BybitConfig = BybitConfig()
-    deepseek: DeepSeekConfig = DeepSeekConfig()
-    analysis: AnalysisConfig = AnalysisConfig()
-    backtest: BacktestConfig = BacktestConfig()
+    binance: BinanceConfig = field(default_factory=BinanceConfig)
+    bybit: BybitConfig = field(default_factory=BybitConfig)
+    deepseek: DeepSeekConfig = field(default_factory=DeepSeekConfig)
+    analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
+    backtest: BacktestConfig = field(default_factory=BacktestConfig)
     log_level: str = "INFO"
     
     def validate(self):
