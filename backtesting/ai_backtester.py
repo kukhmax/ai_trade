@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Callable
 from dataclasses import dataclass
-from ..analysis.ai_core import AISignal
+from analisis.ai_core import AISignal
 
 @dataclass
 class AIBacktestResult:

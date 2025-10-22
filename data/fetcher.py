@@ -1,15 +1,15 @@
 import pandas as pd
 import numpy as np
-from binance.client import Client
-from binance.enums import *
+# from binance.client import Client
+# from binance.enums import *
 from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Optional, Union
-from ..core.config import BinanceConfig
+from core.config import BinanceConfig
 
 class DataFetcher:
     def __init__(self, config: BinanceConfig):
-        self.client = Client(config.api_key, config.api_secret, testnet=config.testnet)
+        # self.client = Client(config.api_key, config.api_secret, testnet=config.testnet)
         self.logger = logging.getLogger(__name__)
         
     async def get_klines(

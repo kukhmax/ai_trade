@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import List
+from typing import List, Dict
 from .engine import Trade
 
 class BacktestMetrics:

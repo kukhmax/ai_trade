@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
 from datetime import datetime
-from ..backtesting.ai_backtester import AIBacktestResult
+from backtesting.ai_backtester import AIBacktestResult
 
 class BacktestPlotter:
     def __init__(self):

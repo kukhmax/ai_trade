@@ -17,7 +17,8 @@ class UniversalAIAgent:
             self.data_fetcher = BybitFetcher(config.bybit)
         else:
             self.data_fetcher = DataFetcher(config.binance)
-        self.ai_analyzer = DeepSeekAnalyzer(config.deepseek.api_key)
+        # Используем ключ Gemini для ИИ-анализа
+        self.ai_analyzer = DeepSeekAnalyzer(config.gemini.api_key)
         
         # Валидация конфигурации
         config.validate()
@@ -113,65 +114,61 @@ class UniversalAIAgent:
                     actual_next_price = None
                     price_change = None
                 
+                was_correct = self._evaluate_signal(ai_signal, price_change) if price_change is not None else None
                 results.append({
                     'timestamp': point,
                     'signal': ai_signal,
                     'actual_price': historical_data['close'].iloc[-1],
                     'actual_next_price': actual_next_price,
-                    'price_change_percent': price_change,
-                    'was_correct': self._evaluate_signal(ai_signal, price_change) if price_change else None
+                    'price_change': price_change,
+                    'was_correct': was_correct,
+                    'is_success': was_correct
                 })
-                
-                # Задержка чтобы не превысить лимиты API
-                await asyncio.sleep(1)
             
             return results
-            
         except Exception as e:
             self.logger.error(f"Ошибка исторического анализа {symbol}: {e}")
             raise
     
     def _generate_analysis_points(self, df: pd.DataFrame, step: str) -> List[pd.Timestamp]:
-        """Генерация точек для исторического анализа"""
-        if step == '1d':
-            freq = 'D'
-        elif step == '4h':
-            freq = '4H'
-        elif step == '1h':
-            freq = 'H'
-        else:
-            freq = 'D'
-        
-        points = pd.date_range(start=df.index[100], end=df.index[-1], freq=freq)
-        return [point for point in points if point in df.index]
+        """Генерация точек анализа на основе шагов"""
+        step_map = {'1h': '1h', '4h': '4h', '1d': '1d'}
+        if step not in step_map:
+            step = '1d'
+        resampled = df.resample(step_map[step]).last()
+        # Пропускаем самую последнюю свечу (неполную)
+        return list(resampled.index[:-1])
     
     def _evaluate_signal(self, signal: AISignal, actual_change: float) -> bool:
-        """Оценка корректности сигнала"""
-        if signal.action == 'HOLD' or abs(actual_change) < 1:
-            return None
-        
-        if signal.action == 'BUY' and actual_change > 0:
+        """Оценка успешности сигнала на основе фактического изменения цены"""
+        if signal.action == 'BUY' and actual_change and actual_change > 0:
             return True
-        elif signal.action == 'SELL' and actual_change < 0:
+        if signal.action == 'SELL' and actual_change and actual_change < 0:
             return True
-        else:
-            return False
+        return False
     
     async def _fetch_news(self, symbol: str) -> List[Dict]:
-        """Получение новостей"""
+        """Получение новостей (заглушка)"""
         return [
             {
-                'title': f'Market analysis for {symbol}',
-                'source': 'CryptoNews',
-                'sentiment': 'positive',
-                'published_at': datetime.now().isoformat()
+                "title": f"{symbol} sees increased on-chain activity amid market volatility",
+                "source": "CryptoNews",
+                "date": datetime.now().isoformat()
+            },
+            {
+                "title": f"Whale movements suggest accumulation phase for {symbol}",
+                "source": "CryptoInsider",
+                "date": datetime.now().isoformat()
             }
         ]
     
     async def _fetch_fundamental(self, symbol: str) -> Dict:
-        """Получение фундаментальных данных"""
+        """Получение фундаментальных данных (заглушка)"""
         return {
-            'market_cap': 'N/A',
-            'volume_24h': 'N/A',
-            'network_activity': 'N/A'
+            "market_cap": "$800B",
+            "dominance": "52%",
+            "onchain": {
+                "active_addresses": "> 900k",
+                "tx_volume": ">$10B"
+            }
         }

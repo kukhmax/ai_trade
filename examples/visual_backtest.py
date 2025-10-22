@@ -6,9 +6,19 @@
 import asyncio
 import plotly.io as pio
 from datetime import datetime, timedelta
-from core.universal_agent import UniversalAIAgent
-from core.config import AppConfig
-from backtesting.enhanced_backtester import EnhancedBacktester
+
+
+try:
+    from core.universal_agent import UniversalAIAgent
+    from core.config import AppConfig
+    from backtesting.enhanced_backtester import EnhancedBacktester
+except ModuleNotFoundError:
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from core.universal_agent import UniversalAIAgent
+    from core.config import AppConfig
+    from backtesting.enhanced_backtester import EnhancedBacktester
 
 async def run_visual_backtest():
     """Запуск бэктеста с визуализацией"""
@@ -119,7 +129,7 @@ async def compare_strategies():
     agent = UniversalAIAgent(config)
     backtester = EnhancedBacktester(agent)
     
-    symbol = "ETHUSDT"
+    symbol = "LTCUSDT"
     timeframe = "1h"
     start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
     end_date = datetime.now().strftime('%Y-%m-%d')

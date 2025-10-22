@@ -4,7 +4,7 @@ from typing import Optional, Dict
 import ccxt
 from datetime import datetime
 
-from ...core.config import BybitConfig
+from core.config import BybitConfig
 
 class BybitFetcher:
     def __init__(self, config: BybitConfig):
@@ -16,15 +16,34 @@ class BybitFetcher:
             'secret': config.api_secret,
             'enableRateLimit': True,
             'timeout': config.request_timeout * 1000,
-            'options': { 'defaultType': config.market_type },
+            'options': {
+                'defaultType': config.market_type,
+                # авто-калибровка разницы времени
+                'adjustForTimeDifference': config.adjust_time,
+                # окно допустимого рассинхрона времени (используется ccxt для подписи при необходимости)
+                'recvWindow': config.recv_window,
+                'recv_window': config.recv_window,
+            },
         })
         try:
             # Включаем режим песочницы при необходимости
             self.exchange.setSandboxMode(config.testnet)
+            # Явная калибровка времени: получаем серверное время и считаем дельту
+            try:
+                if config.adjust_time and getattr(self.exchange, 'has', {}).get('fetchTime', False):
+                    server_ms = self.exchange.fetch_time()
+                    local_ms = self.exchange.milliseconds()
+                    diff = int(server_ms - local_ms)
+                    # ccxt будет учитывать эту поправку при подписи
+                    self.exchange.options['timeDifference'] = diff
+                    self.logger.info(f"Синхронизация времени Bybit: {diff} мс")
+            except Exception as te:
+                self.logger.warning(f"Не удалось выполнить синхронизацию времени: {te}")
+            # Загрузка рынков
             self.exchange.load_markets()
         except Exception as e:
             self.logger.warning(f"Не удалось загрузить рынки Bybit: {e}")
-    
+
     def _normalize_symbol(self, symbol: str) -> str:
         """Нормализация символа под ccxt и выбранный тип рынка.
         Поддерживает вход вида BTCUSDT, BTC/USDT, BTC/USDT:USDT, btc-usdt, и т.п.
@@ -62,7 +81,7 @@ class BybitFetcher:
             return candidate
         # В противном случае возвращаем кандидат — ccxt попытается сопоставить
         return candidate
-    
+
     def _parse_datetime_to_ms(self, date_str: Optional[str]) -> Optional[int]:
         if not date_str:
             return None
@@ -77,7 +96,7 @@ class BybitFetcher:
             except Exception:
                 self.logger.warning(f"Не удалось распарсить дату: {date_str}")
                 return None
-    
+
     async def get_klines(
         self,
         symbol: str,
@@ -90,7 +109,7 @@ class BybitFetcher:
         try:
             market_symbol = self._normalize_symbol(symbol)
             since = self._parse_datetime_to_ms(start_str)
-            # ccxt fetch_ohlcv не принимает end_str напрямую; ограничиваем по limit
+            # Публичный метод fetch_ohlcv: не прокидываем приватные параметры
             ohlcv = self.exchange.fetch_ohlcv(market_symbol, timeframe=interval, since=since, limit=limit)
             df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
@@ -102,18 +121,19 @@ class BybitFetcher:
         except Exception as e:
             self.logger.error(f"Ошибка получения свечей Bybit для {symbol}: {e}")
             raise
-    
+
     async def get_current_price(self, symbol: str) -> float:
         """Текущая цена инструмента"""
         try:
             market_symbol = self._normalize_symbol(symbol)
+            # Публичный метод fetch_ticker: не прокидываем приватные параметры
             ticker = self.exchange.fetch_ticker(market_symbol)
             # Используем 'last' как текущую цену
             return float(ticker.get('last') or ticker.get('close'))
         except Exception as e:
             self.logger.error(f"Ошибка получения цены Bybit для {symbol}: {e}")
             raise
-    
+
     async def get_exchange_info(self, symbol: str) -> Dict:
         """Информация о рынке"""
         try:
@@ -129,11 +149,12 @@ class BybitFetcher:
         except Exception as e:
             self.logger.error(f"Ошибка получения информации о рынке Bybit для {symbol}: {e}")
             raise
-    
+
     async def get_24h_ticker(self, symbol: str) -> Dict:
         """Статистика за 24 часа"""
         try:
             market_symbol = self._normalize_symbol(symbol)
+            # Публичный метод fetch_ticker: не прокидываем приватные параметры
             ticker = self.exchange.fetch_ticker(market_symbol)
             return {
                 'symbol': market_symbol,

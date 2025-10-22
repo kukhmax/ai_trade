@@ -1,10 +1,10 @@
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 import pandas as pd
-from ..analysis.technical import TechnicalSignal
-from ..analysis.wyckoff import WyckoffPhase
-from ..analysis.elliott import ElliottWave
-from ..analysis.sentiment import SentimentAnalysis
+from analisis.technical import TechnicalSignal
+from analisis.wyckoff import WyckoffPhase
+from analisis.elliott import ElliottWave
+from analisis.sentiment import SentimentAnalysis
 
 @dataclass
 class TradingSignal:

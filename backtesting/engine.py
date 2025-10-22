@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass
-from ..signals.generator import TradingSignal
+from signals.generator import TradingSignal
 
 @dataclass
 class Trade:

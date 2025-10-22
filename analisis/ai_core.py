@@ -1,9 +1,10 @@
-import aiohttp
 import json
 import pandas as pd
 from typing import Dict, List, Any
 import logging
 from dataclasses import dataclass
+from google import genai
+import asyncio
 
 @dataclass
 class AISignal:
@@ -19,8 +20,10 @@ class AISignal:
 class DeepSeekAnalyzer:
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = "https://api.deepseek.com/v1"
+        self.model = "gemini-2.0-flash"
         self.logger = logging.getLogger(__name__)
+        # Официальный клиент Gemini
+        self.client = genai.Client(api_key=self.api_key, http_options={"api_version": "v1"})
     
     async def analyze_market(
         self,
@@ -31,18 +34,18 @@ class DeepSeekAnalyzer:
         news_data: List[Dict] = None,
         fundamental_data: Dict = None
     ) -> AISignal:
-        """Основной метод анализа через DeepSeek API"""
+        """Основной метод анализа через ИИ API"""
         
         # Подготовка данных для ИИ
         market_context = self._prepare_market_context(
             symbol, df, analysis_methods, timeframe, news_data, fundamental_data
         )
         
-        # Создание промпта для DeepSeek
+        # Создание промпта для ИИ
         prompt = self._create_analysis_prompt(market_context)
         
-        # Запрос к DeepSeek API
-        response = await self._query_deepseek(prompt)
+        # Запрос к ИИ API
+        response = await self._query_ai(prompt)
         
         # Парсинг ответа
         return self._parse_ai_response(response, symbol, timeframe)
@@ -82,7 +85,7 @@ class DeepSeekAnalyzer:
         return context
     
     def _create_analysis_prompt(self, context: Dict) -> str:
-        """Создание детального промпта для DeepSeek"""
+        """Создание детального промпта для ИИ"""
         
         prompt = f"""
         Ты - профессиональный трейдер и финансовый аналитик с 20-летним опытом. 
@@ -92,7 +95,7 @@ class DeepSeekAnalyzer:
         ТАЙМФРЕЙМ: {context['timeframe']}
         ТЕКУЩАЯ ЦЕНА: {context['current_price']:.2f}
 
-        ДАННЫЕ ДЛЯ АНАЛИЗА:
+        ДАННЫХ ДЛЯ АНАЛИЗА:
 
         1. Ценовое действие:
         {context['price_action']}
@@ -159,44 +162,78 @@ class DeepSeekAnalyzer:
             
         return specialized
     
-    async def _query_deepseek(self, prompt: str) -> Dict:
-        """Запрос к DeepSeek API"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                data = {
-                    "model": "deepseek-chat",
-                    "messages": [
-                        {
-                            "role": "system", 
-                            "content": "Ты - эксперт по трейдингу и техническому анализу. Всегда отвечай в формате JSON."
+    async def _query_ai(self, prompt: str) -> Dict:
+        """Запрос к Gemini API через официальный SDK"""
+        # Простейшие ретраи для временных ошибок перегрузки (503/UNAVAILABLE)
+        for attempt in range(3):
+            try:
+                def _call():
+                    return self.client.models.generate_content(
+                        model=self.model,
+                        contents=prompt,
+                        config={
+                            "temperature": 0.3,
+                            "max_output_tokens": 2000,
                         },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    "temperature": 0.3,
-                    "max_tokens": 2000,
-                    "response_format": {"type": "json_object"}
-                }
-                
-                async with session.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=data
-                ) as response:
-                    result = await response.json()
-                    return json.loads(result['choices'][0]['message']['content'])
-                    
-        except Exception as e:
-            self.logger.error(f"DeepSeek API error: {e}")
-            return self._get_fallback_response()
+                    )
+                result = await asyncio.to_thread(_call)
+
+                # Пытаемся извлечь текст ответа
+                content_text = getattr(result, 'text', None)
+                if not isinstance(content_text, str) or not content_text:
+                    try:
+                        as_dict = getattr(result, 'to_dict', None)
+                        if callable(as_dict):
+                            asd = as_dict()
+                            candidates = asd.get("candidates") if isinstance(asd, dict) else None
+                            if isinstance(candidates, list) and candidates:
+                                content = (candidates[0].get("content") or {})
+                                parts = content.get("parts") or []
+                                if isinstance(parts, list) and parts:
+                                    content_text = parts[0].get("text")
+                    except Exception:
+                        pass
+
+                if not content_text or not isinstance(content_text, str):
+                    self.logger.error("Gemini SDK: не удалось извлечь текст ответа")
+                    return self._get_fallback_response()
+
+                # Пробуем распарсить как чистый JSON
+                parsed = self._try_parse_json(content_text)
+                if parsed is not None:
+                    return parsed
+
+                # Если не получилось — fallback
+                self.logger.error(f"Gemini SDK: ответ не JSON. Фрагмент: {content_text[:200]}")
+                return self._get_fallback_response()
+
+            except Exception as e:
+                msg = str(e)
+                if '503' in msg or 'UNAVAILABLE' in msg:
+                    # Бэкофф перед повтором
+                    await asyncio.sleep(1.0 * (attempt + 1))
+                    continue
+                self.logger.error(f"Gemini SDK error: {e}")
+                return self._get_fallback_response()
+
+        # Все попытки исчерпаны
+        self.logger.error("Gemini SDK: все попытки запроса исчерпаны (503/UNAVAILABLE)")
+        return self._get_fallback_response()
     
+    def _try_parse_json(self, text: str) -> Dict[str, Any] | None:
+        """Пытаемся распарсить JSON, при необходимости вырезая блок {...}."""
+        try:
+            return json.loads(text)
+        except Exception:
+            start = text.find('{')
+            end = text.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                try:
+                    return json.loads(text[start:end+1])
+                except Exception:
+                    return None
+            return None
+
     def _parse_ai_response(self, response: Dict, symbol: str, timeframe: str) -> AISignal:
         """Парсинг ответа от ИИ"""
         try:
@@ -282,12 +319,40 @@ class DeepSeekAnalyzer:
         }
     
     def _get_market_sentiment(self, df: pd.DataFrame) -> str:
-        """Анализ рыночных настроений"""
-        price_change_1d = (df['close'].iloc[-1] - df['close'].iloc[-24]) / df['close'].iloc[-24] * 100
-        price_change_7d = (df['close'].iloc[-1] - df['close'].iloc[-168]) / df['close'].iloc[-168] * 100
-        
+        """Анализ рыночных настроений с защитой от недостатка данных"""
+        if df is None or df.empty or 'close' not in df.columns:
+            return (
+                "Настроения: Неопределённые\n"
+                "Изменение за 1 день: 0.00%\n"
+                "Изменение за 7 дней: 0.00%\n"
+            )
+
+        last = df['close'].iloc[-1]
+
+        # Безопасное вычисление изменения за 1 день (24 бара для часового ТФ)
+        if len(df) > 24:
+            base_1d = df['close'].iloc[-24]
+        elif len(df) > 1:
+            base_1d = df['close'].iloc[0]
+        else:
+            base_1d = last
+
+        price_change_1d = ((last - base_1d) / base_1d * 100) if base_1d else 0.0
+
+        # Безопасное вычисление изменения за 7 дней (168 баров для часового ТФ)
+        if len(df) > 168:
+            base_7d = df['close'].iloc[-168]
+        elif len(df) > 24:
+            base_7d = df['close'].iloc[-24]
+        elif len(df) > 1:
+            base_7d = df['close'].iloc[0]
+        else:
+            base_7d = last
+
+        price_change_7d = ((last - base_7d) / base_7d * 100) if base_7d else 0.0
+
         sentiment = "Бычий" if price_change_1d > 0 else "Медвежий"
-        
+
         return f"""
         Настроения: {sentiment}
         Изменение за 1 день: {price_change_1d:.2f}%

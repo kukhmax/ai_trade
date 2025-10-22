@@ -1,5 +1,5 @@
 # Базовые библиотеки
-python-binance>=3.0.0
+
 ccxt>=4.0.0
 pandas>=1.5.0
 numpy>=1.21.0
@@ -36,3 +36,6 @@ dash-bootstrap-components>=1.5.0
 # Дополнительные утилиты
 python-telegram-bot>=20.0
 websocket-client>=1.6.0
+
+# Gemini SDK (официальный)
+google-genai>=0.3.0

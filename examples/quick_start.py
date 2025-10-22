@@ -5,8 +5,16 @@
 
 import asyncio
 import logging
-from core.universal_agent import UniversalAIAgent
-from core.config import AppConfig
+# Поддержка запуска как `python -m examples.quick_start` и как `python examples/quick_start.py`
+try:
+    from core.universal_agent import UniversalAIAgent
+    from core.config import AppConfig
+except ModuleNotFoundError:
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from core.universal_agent import UniversalAIAgent
+    from core.config import AppConfig
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -28,8 +36,8 @@ async def quick_analysis():
         return
     
     # Список пар для анализа
-    symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
-    timeframe = "4h"
+    symbols = ["BTCUSDT", "ETHUSDT", "LTCUSDT"]
+    timeframe = "1h"
     methods = ["technical", "wyckoff", "elliott"]
     
     print(f"\n📊 Анализ пар: {', '.join(symbols)}")

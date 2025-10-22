@@ -1,8 +1,9 @@
-import aiohttp
 import json
 from typing import Dict, List
 from dataclasses import dataclass
 import logging
+from google import genai
+import asyncio
 
 @dataclass
 class SentimentAnalysis:
@@ -16,53 +17,79 @@ class SentimentAnalyzer:
     def __init__(self, api_key: str, base_url: str):
         self.api_key = api_key
         self.base_url = base_url
+        self.model = "gemini-2.0-flash"
         self.logger = logging.getLogger(__name__)
+        # Официальный клиент Gemini
+        self.client = genai.Client(api_key=self.api_key, http_options={"api_version": "v1"})
     
     async def analyze_news(self, symbol: str, news_data: List[Dict]) -> SentimentAnalysis:
-        """Анализ новостей через DeepSeek API"""
+        """Анализ новостей через официальный Gemini SDK"""
         prompt = self._create_sentiment_prompt(symbol, news_data)
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                data = {
-                    "model": "deepseek-chat",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a financial sentiment analysis expert. Analyze the given crypto news and provide sentiment analysis in JSON format."
+        # Простейшие ретраи для временных ошибок перегрузки (503/UNAVAILABLE)
+        for attempt in range(3):
+            try:
+                def _call():
+                    return self.client.models.generate_content(
+                        model=self.model,
+                        contents=prompt,
+                        config={
+                            "temperature": 0.3,
+                            "max_output_tokens": 800,
                         },
-                        {
-                            "role": "user", 
-                            "content": prompt
-                        }
-                    ],
-                    "response_format": {"type": "json_object"}
-                }
-                
-                async with session.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=data
-                ) as response:
-                    result = await response.json()
-                    sentiment_data = json.loads(result['choices'][0]['message']['content'])
-                    
-                    return SentimentAnalysis(
-                        overall_sentiment=sentiment_data.get('overall_sentiment', 'NEUTRAL'),
-                        confidence=sentiment_data.get('confidence', 0.5),
-                        positive_factors=sentiment_data.get('positive_factors', []),
-                        negative_factors=sentiment_data.get('negative_factors', []),
-                        score=sentiment_data.get('sentiment_score', 0.0)
                     )
-                    
-        except Exception as e:
-            self.logger.error(f"Error in sentiment analysis: {e}")
-            return self._get_default_sentiment()
+                
+                result = await asyncio.to_thread(_call)
+                
+                # Извлекаем агрегированный текст
+                content_text = None
+                try:
+                    content_text = getattr(result, 'text', None)
+                except Exception:
+                    content_text = None
+                
+                if not content_text:
+                    try:
+                        as_dict = getattr(result, 'to_dict', None)
+                        if callable(as_dict):
+                            asd = as_dict()
+                            candidates = asd.get('candidates') if isinstance(asd, dict) else None
+                            if isinstance(candidates, list) and candidates:
+                                content = (candidates[0].get('content') or {})
+                                parts = content.get('parts') or []
+                                if isinstance(parts, list) and parts:
+                                    content_text = parts[0].get('text')
+                    except Exception:
+                        pass
+                
+                if not content_text or not isinstance(content_text, str):
+                    self.logger.error("Gemini SDK: не удалось извлечь текст ответа (sentiment)")
+                    return self._get_default_sentiment()
+                
+                # Парсим JSON
+                sentiment_data = self._try_parse_json(content_text)
+                if sentiment_data is None:
+                    self.logger.error(f"Gemini SDK: ответ не JSON (sentiment). Фрагмент: {content_text[:200]}")
+                    return self._get_default_sentiment()
+                
+                return SentimentAnalysis(
+                    overall_sentiment=sentiment_data.get('overall_sentiment', 'NEUTRAL'),
+                    confidence=sentiment_data.get('confidence', 0.5),
+                    positive_factors=sentiment_data.get('positive_factors', []),
+                    negative_factors=sentiment_data.get('negative_factors', []),
+                    score=sentiment_data.get('sentiment_score', 0.0)
+                )
+            except Exception as e:
+                msg = str(e)
+                if '503' in msg or 'UNAVAILABLE' in msg:
+                    await asyncio.sleep(1.0 * (attempt + 1))
+                    continue
+                self.logger.error(f"Error in sentiment analysis: {e}")
+                return self._get_default_sentiment()
+        
+        # Все попытки исчерпаны
+        self.logger.error("Gemini SDK: все попытки запроса исчерпаны (503/UNAVAILABLE) (sentiment)")
+        return self._get_default_sentiment()
     
     def _create_sentiment_prompt(self, symbol: str, news_data: List[Dict]) -> str:
         """Создание промпта для анализа настроений"""

@@ -29,6 +29,10 @@ class BybitConfig:
     # spot или linear (USDT perpetual). По умолчанию linear
     market_type: str = os.getenv('BYBIT_MARKET_TYPE', 'linear')
     request_timeout: int = 30
+    # окно допустимого рассинхрона времени на стороне сервера (мс)
+    recv_window: int = int(os.getenv('BYBIT_RECV_WINDOW', '50000'))
+    # авто-калибровка разницы времени через ccxt
+    adjust_time: bool = env_bool('BYBIT_ADJUST_TIME', True)
 
 
 @dataclass
@@ -38,6 +42,15 @@ class DeepSeekConfig:
     model: str = "deepseek-chat"
     temperature: float = 0.3
     max_tokens: int = 2000
+
+
+@dataclass
+class GeminiConfig:
+    api_key: str = os.getenv('GEMINI_API_KEY', '')
+    base_url: str = os.getenv('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1')
+    model: str = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
+    temperature: float = float(os.getenv('GEMINI_TEMPERATURE', '0.3'))
+    max_tokens: int = int(os.getenv('GEMINI_MAX_TOKENS', '2000'))
 
 
 @dataclass
@@ -68,14 +81,15 @@ class AppConfig:
     binance: BinanceConfig = field(default_factory=BinanceConfig)
     bybit: BybitConfig = field(default_factory=BybitConfig)
     deepseek: DeepSeekConfig = field(default_factory=DeepSeekConfig)
+    gemini: GeminiConfig = field(default_factory=GeminiConfig)
     analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
     log_level: str = "INFO"
     
     def validate(self):
         """Проверка конфигурации"""
-        if not self.deepseek.api_key:
-            raise ValueError("DEEPSEEK_API_KEY не установлен в .env файле")
+        if not self.deepseek.api_key and not self.gemini.api_key:
+            raise ValueError("Установите DEEPSEEK_API_KEY или GEMINI_API_KEY в .env файле")
         
         if self.exchange not in ['bybit', 'binance']:
             raise ValueError("EXCHANGE должен быть 'bybit' или 'binance'")

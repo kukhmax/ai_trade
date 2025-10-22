@@ -27,8 +27,8 @@ class CryptoAIAgent:
         self.wyckoff_analyzer = WyckoffAnalyzer()
         self.elliott_analyzer = ElliottWaveAnalyzer()
         self.sentiment_analyzer = SentimentAnalyzer(
-            config.deepseek.api_key, 
-            config.deepseek.base_url
+            config.gemini.api_key,
+            config.gemini.base_url
         )
         self.signal_generator = SignalGenerator()
         

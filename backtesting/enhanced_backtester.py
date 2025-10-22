@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict
 from dataclasses import dataclass
-from ..core.universal_agent import UniversalAIAgent
-from ..visualization.backtest_plotter import BacktestPlotter
+from core.universal_agent import UniversalAIAgent
+from visualization.backtest_plotter import BacktestPlotter
+from backtesting.ai_backtester import AIBacktester, AIBacktestResult
 
 @dataclass
 class EnhancedBacktestResult:
@@ -34,28 +35,30 @@ class EnhancedBacktester:
             symbol, timeframe, start_str=start_date, end_str=end_date
         )
         
-        # Запускаем стандартный бэктест
-        basic_results = await self.ai_agent.historical_analysis(
+        # Запускаем стандартный бэктест через AIBacktester, чтобы получить AIBacktestResult
+        ai_backtester = AIBacktester(self.ai_agent)
+        basic_results = await ai_backtester.run_backtest(
             symbol=symbol,
             timeframe=timeframe,
             analysis_methods=analysis_methods,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            initial_capital=initial_capital
         )
         
         # Создаем детальную историю сделок
-        trade_history = self._create_trade_history(basic_results, initial_capital)
+        trade_history = self._create_trade_history(basic_results.detailed_results, initial_capital)
         
         # Создаем кривую капитала
         equity_curve = self._create_equity_curve(trade_history, initial_capital)
         
         # Расчет дополнительных метрик
-        metrics = self._calculate_enhanced_metrics(basic_results, trade_history, equity_curve)
+        metrics = self._calculate_enhanced_metrics(basic_results.detailed_results, trade_history, equity_curve)
         
         # Подготавливаем данные для визуализации
         visualization_data = {
             'historical_data': historical_data,
-            'trade_signals': basic_results,
+            'trade_signals': basic_results.detailed_results,
             'equity_curve': equity_curve,
             'metrics': metrics
         }
@@ -150,6 +153,18 @@ class EnhancedBacktester:
         avg_win = np.mean([t['pnl'] for t in winning_trades]) if winning_trades else 0
         avg_loss = np.mean([t['pnl'] for t in losing_trades]) if losing_trades else 0
         
+        # Расчет максимальной просадки и Sharpe из кривой капитала
+        if equity_curve is not None and not equity_curve.empty and 'equity' in equity_curve.columns:
+            equity_series = equity_curve['equity']
+            rolling_max = equity_series.cummax()
+            drawdowns = (equity_series / rolling_max) - 1.0
+            max_drawdown = float(-drawdowns.min() * 100)
+            returns = equity_series.pct_change().dropna()
+            sharpe_ratio = float((returns.mean() / returns.std()) * (252 ** 0.5)) if returns.std() != 0 else 0.0
+        else:
+            max_drawdown = 0.0
+            sharpe_ratio = 0.0
+        
         return {
             'total_trades': len(trades),
             'winning_trades': len(winning_trades),
@@ -161,7 +176,9 @@ class EnhancedBacktester:
             'profit_factor': abs(avg_win / avg_loss) if avg_loss != 0 else float('inf'),
             'largest_win': max(t['pnl'] for t in trades) if trades else 0,
             'largest_loss': min(t['pnl'] for t in trades) if trades else 0,
-            'avg_trade_duration': np.mean([t['duration'] for t in trades]) if trades else 0
+            'avg_trade_duration': np.mean([t['duration'] for t in trades]) if trades else 0,
+            'max_drawdown': max_drawdown,
+            'sharpe_ratio': sharpe_ratio
         }
     
     def generate_comprehensive_report(self, result: EnhancedBacktestResult, 

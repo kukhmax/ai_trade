@@ -141,9 +141,9 @@ Options:
 ### 1. Установка зависимостей
 ```bash
 # Создание виртуального окружения
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
 
 # Установка пакетов
 pip install -r requirements.txt
